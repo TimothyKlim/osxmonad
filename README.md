@@ -42,6 +42,16 @@ Create `~/.xmonad/xmonad.hs`:
 
 Now we can run `xmonad` to have our windows managed.
 
+## Videos
+
+[
+![](http://b.vimeocdn.com/ts/369/421/369421287_640.jpg)
+](https://vimeo.com/53482928)
+
+[
+![](http://b.vimeocdn.com/ts/351/155/351155192_640.jpg)
+](https://vimeo.com/50960925)
+
 ## License
 
 BSD-3
