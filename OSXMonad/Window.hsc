@@ -3,6 +3,7 @@ module OSXMonad.Window where
 
 import Foreign
 import Foreign.C
+import Foreign.C.String
 
 #include "utils.h"
 
@@ -39,8 +40,17 @@ foreign import ccall "utils.h &globalEvent"
 foreign import ccall "utils.h collectEvent"
   collectEvent :: IO ()
 
-foreign import ccall "utils.h isSpaceTransitioning"
-  isSpaceTransitioning :: IO Bool
+foreign import ccall "utils.h isMainDisplayTransitioning"
+  isMainDisplayTransitioning :: IO Bool
+
+foreign import ccall "utils.h getSpacesCount"
+  getSpacesCount :: IO Int
+
+foreign import ccall "utils.h setupSpaces"
+  setupSpaces :: Int -> Ptr CString -> IO ()
+
+foreign import ccall "utils.h changeToSpace"
+  changeToSpace :: CString -> IO ()
 
 data CGPoint = CGPoint { x :: ArchCFloat, y :: ArchCFloat } deriving Show
 data CGSize = CGSize { width :: ArchCFloat, height :: ArchCFloat } deriving Show

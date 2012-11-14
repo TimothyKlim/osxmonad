@@ -86,11 +86,13 @@ tile' context = do
 
   ws <- XM.gets C.windowset
 
+  XM.io $ withCAString (S.tag . S.workspace . S.current $ ws) changeToSpace
+
   namedWindows <- XM.io . getNamedWindows $ context
   let wids = map (fromIntegral . wid) namedWindows
       newStack = S.modify Nothing (S.filter (`elem` wids)) $ foldr S.insertUp ws $ wids
 
-  XM.modify (\s -> s { XM.windowset = newStack })
+  XM.modify (\s -> s { C.windowset = newStack })
 
   let rect = C.screenRect . S.screenDetail . S.current $ ws
   (rectangles, _) <- C.runLayout (S.workspace . S.current $ ws) rect
@@ -110,7 +112,7 @@ tile' context = do
 
 tile :: XM.X ()
 tile = do
-  transitioning <- XM.io $ isSpaceTransitioning
+  transitioning <- XM.io $ isMainDisplayTransitioning
   if transitioning
     then return ()
     else do
@@ -142,6 +144,7 @@ osxWindows f = do
   let ws = f old
   XM.modify (\s -> s { C.windowset = ws })
 
+
 osxSendMessage :: C.Message a => a -> XM.X ()
 osxSendMessage a = do
     w <- S.workspace . S.current <$> XM.gets C.windowset
@@ -152,28 +155,36 @@ osxSendMessage a = do
                                   { S.layout = l' }}}
 
 osxKeys :: C.XConfig C.Layout -> Map.Map (XM.KeyMask, XM.KeySym) (C.X ())
-osxKeys (C.XConfig {C.modMask = modMask}) = Map.fromList
+osxKeys conf@(C.XConfig {C.modMask = modMask}) = Map.fromList $
           [ ((modMask,                  XM.xK_space ), osxSendMessage L.NextLayout)
-          , ((modMask,                  XM.xK_Tab   ), osxWindows S.focusDown)
-          , ((modMask .|. XM.shiftMask, XM.xK_Tab   ), osxWindows S.focusUp  )
-          , ((modMask,                  XM.xK_j     ), osxWindows S.focusDown)
-          , ((modMask,                  XM.xK_k     ), osxWindows S.focusUp  )
-          , ((modMask,                  XM.xK_m     ), osxWindows S.focusMaster  )
-          , ((modMask,                  XM.xK_Return), osxWindows S.swapMaster)
-          , ((modMask .|. XM.shiftMask, XM.xK_j     ), osxWindows S.swapDown  )
-          , ((modMask .|. XM.shiftMask, XM.xK_k     ), osxWindows S.swapUp    )
-          , ((modMask,                  XM.xK_h     ), osxSendMessage L.Shrink)
-          , ((modMask,                  XM.xK_l     ), osxSendMessage L.Expand)
+          , ((modMask,                  XM.xK_Tab   ), osxWindows S.focusDown     )
+          , ((modMask .|. XM.shiftMask, XM.xK_Tab   ), osxWindows S.focusUp       )
+          , ((modMask,                  XM.xK_j     ), osxWindows S.focusDown     )
+          , ((modMask,                  XM.xK_k     ), osxWindows S.focusUp       )
+          , ((modMask,                  XM.xK_m     ), osxWindows S.focusMaster   )
+          , ((modMask,                  XM.xK_Return), osxWindows S.swapMaster    )
+          , ((modMask .|. XM.shiftMask, XM.xK_j     ), osxWindows S.swapDown      )
+          , ((modMask .|. XM.shiftMask, XM.xK_k     ), osxWindows S.swapUp        )
+          , ((modMask,                  XM.xK_h     ), osxSendMessage L.Shrink    )
+          , ((modMask,                  XM.xK_l     ), osxSendMessage L.Expand    )
           ]
+          ++
+          [((m .|. modMask, k), osxWindows $ f i)
+              | (i, k) <- zip (C.workspaces conf) [XM.xK_1 .. XM.xK_9]
+              , (f, m) <- [(S.greedyView, 0), (S.shift, XM.shiftMask)]]
 
 osxmonad :: (C.LayoutClass l XM.Window, Read (l XM.Window)) => XM.XConfig l -> IO ()
 osxmonad initxmc = do
   setupEventCallback
 
   rect <- screenRectangle
+  spacesCount <- getSpacesCount
 
   let display = error "display"
-      xmc = initxmc { C.layoutHook = C.Layout $ C.layoutHook initxmc }
+      workspaces = take spacesCount $ C.workspaces initxmc
+      xmc = initxmc
+            { C.layoutHook = C.Layout $ C.layoutHook initxmc
+            , C.workspaces = workspaces }
       theRoot = 0
       normalBorder = 0
       focusedBorder = 0
@@ -184,7 +195,7 @@ osxmonad initxmc = do
 
       layout = C.layoutHook xmc
 
-      windowset = S.new layout (C.workspaces xmc) $ [C.SD rect] -- TODO: All screen sizes
+      windowset = S.new layout workspaces [C.SD rect] -- TODO: All screen sizes
       mapped = Set.empty
       waitingUnmap = Map.empty
       dragging = Nothing
@@ -200,6 +211,9 @@ osxmonad initxmc = do
       hPutStrLn stderr "You need to enable access for Accessible Devices in Universal Access"
       exitWith $ ExitFailure 1
     else do
+      cstrings <- forM workspaces newCAString
+      withArrayLen cstrings setupSpaces
+      forM_ cstrings free
       XM.runX conf state . forever $ do
            tile
            XM.io . threadDelay $ 1000 * 500

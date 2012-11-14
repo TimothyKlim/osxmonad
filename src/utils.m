@@ -5,6 +5,72 @@
 
 #include <Carbon/Carbon.h>
 
+int getSpacesCount() {
+    CFArrayRef spaces = CGSCopySpaces(CGSDefaultConnection, kCGSSpaceAll);
+    int count = CFArrayGetCount(spaces) - 1;
+    CFRelease(spaces);
+    return count;
+}
+
+void setupSpaces(int xmonadCount, char **xmonadNames) {
+    if(xmonadCount > SPACES_ELEMENTS_LENGTH) {
+        xmonadCount = SPACES_ELEMENTS_LENGTH;
+    }
+
+    CFArrayRef spaces = CGSCopySpaces(CGSDefaultConnection, 7);
+    uint32_t count = CFArrayGetCount(spaces);
+
+    // Go through Spaces backwards. Seems to give correct order on my
+    // computer.
+
+    int i;
+    for(i = count - 1; i >= 0 && globalSpacesLength < xmonadCount; i--) {
+        CGSSpace spaceId = [CFArrayGetValueAtIndex(spaces, i) intValue];
+        if(CGSSpaceGetType(CGSDefaultConnection, spaceId) == kCGSSpaceSystem)
+            continue;
+
+        Space *dest = &globalSpaces[globalSpacesLength];
+
+        dest->spaceId = spaceId;
+
+        strncpy(dest->xmonadName, xmonadNames[globalSpacesLength], SPACE_NAME_LENGTH - 1);
+        dest->xmonadName[SPACE_NAME_LENGTH - 1] = '\0';
+
+        globalSpacesLength++;
+    }
+
+    CFRelease(spaces);
+}
+
+void changeToSpace(char *xmonadName) {
+    int i;
+    for(i = 0; i < globalSpacesLength; i++) {
+        if(strcmp(globalSpaces[i].xmonadName, xmonadName) != 0) continue;
+        if(i == currentSpaceIndex) return;
+
+        currentSpaceIndex = i;
+
+        CFArrayRef currentSpace = CGSCopySpaces(CGSDefaultConnection, kCGSSpaceCurrent);
+        uint64_t currentSpaceId = [CFArrayGetValueAtIndex(currentSpace, 0) intValue];
+        CFRelease(currentSpace);
+
+        NSNumber *n;
+        NSArray *toChange;
+
+        n = [NSNumber numberWithUnsignedLongLong:currentSpaceId];
+        toChange = [NSArray arrayWithObjects:&n count:1];
+        CGSHideSpaces(CGSDefaultConnection, toChange);
+
+        n = [NSNumber numberWithUnsignedLongLong:globalSpaces[i].spaceId];
+        toChange = [NSArray arrayWithObjects:&n count:1];
+        CGSShowSpaces(CGSDefaultConnection, toChange);
+
+        CGSManagedDisplaySetCurrentSpace(CGSDefaultConnection, kCGSPackagesMainDisplayIdentifier, globalSpaces[i].spaceId);
+
+        return;
+    }
+}
+
 void getProcessWindows(ProcessSerialNumber *psn, CFArrayRef *windows) {
     pid_t pid;
     GetProcessPID(psn, &pid);
@@ -59,10 +125,8 @@ void setWindowSize(CGSize size, AXUIElementRef window) {
     CFRelease(valueRef);
 }
 
-bool isSpaceTransitioning() {
-    int spaceNumber = -1;
-    CGSGetWorkspace(_CGSDefaultConnection(), &spaceNumber);
-    return spaceNumber == SPACES_TRANSITIONING_ID;
+bool isMainDisplayTransitioning() {
+    return CGSManagedDisplayIsAnimating(CGSDefaultConnection, kCGSPackagesMainDisplayIdentifier);
 }
 
 void setWindow(Window *window) {
