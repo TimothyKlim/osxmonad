@@ -5,7 +5,7 @@ This is a library which allows XMonad to manage Mac OS X windows.
 ## Status
 
 * Only attached hook is `layoutHook`
-* No workspaces
+* No Xinerama (multiple monitor support)
 * No borders
 * No `focusFollowsMouse`
 
