@@ -15,7 +15,7 @@ We need XMonad's compilation step to include the `-framework Cocoa`
 flag to GHC. This repository includes a `xmonad.patch` (1 line diff)
 that you must apply to the XMonad source:
 
-    git clone git://github.com/pufuwozu/osxmonad.git
+    git clone git://github.com/xmonad/osxmonad.git
     darcs get http://code.haskell.org/xmonad
     cd xmonad
     darcs apply ../osxmonad/xmonad.patch
