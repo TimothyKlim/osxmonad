@@ -19,6 +19,7 @@ that you must apply to the XMonad source:
     darcs get http://code.haskell.org/xmonad
     cd xmonad
     darcs apply ../osxmonad/xmonad.patch
+    cabal install "X11 >=1.5 && <1.7"
     cabal configure
     cabal install
     cd ../osxmonad
